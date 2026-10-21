@@ -20,7 +20,7 @@ def fetch(i):
     for _ in range(3):
         try:
             req = urllib.request.Request(os.environ['WORKER'] + '/vimg?' + q, headers={'X-Video': os.environ['VS'], 'User-Agent': 'hooshfa-video/2 (+github actions)'})
-            data = urllib.request.urlopen(req, timeout=150).read()
+            resp = urllib.request.urlopen(req, timeout=150); data = resp.read(); print('img', i, resp.headers.get('x-by'), flush=True)
             img = cv2.imdecode(np.frombuffer(data, np.uint8), cv2.IMREAD_COLOR)
             if img is not None: return img
         except Exception as e: print('img retry', i, e)
@@ -149,3 +149,5 @@ r = subprocess.run(['curl', '-s', '-F', 'chat_id=' + os.environ['CHAT'], '-F', '
     '-F', 'supports_streaming=true', '-F', f'width={W}', '-F', f'height={H}', '-F', f'duration={int(T)}', '-F', 'reply_markup=' + json.dumps(kb),
     f'https://api.telegram.org/bot{os.environ["BOT"]}/sendVideo'], capture_output=True, text=True).stdout
 if '"ok":true' not in r: raise SystemExit('telegram send failed: ' + r[:200])
+try: print('FILE_ID', json.loads(r)['result']['video']['file_id'])
+except Exception: pass
