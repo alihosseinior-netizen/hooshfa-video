@@ -51,7 +51,7 @@ def make(kind='calm', seconds=15.0, path='m.wav', seed=0):
             if nn <= 0: continue
             m = seq[j % len(seq)] + 12
             arp[ss:ss + nn] += tone(f(m), nn, harm=3, bright=0.35) * np.exp(-np.arange(nn) / SR * (7 if arps == 2 else 4)) * 0.11
-        if drums:
+        if drums and b >= 2:  # intro bars without drums, then the beat comes in
             for q in range(4):
                 ss = s + int(q * beat * SR); nn = min(int(0.45 * SR), N - ss)
                 if nn <= 0: continue
