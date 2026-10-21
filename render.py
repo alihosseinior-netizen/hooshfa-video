@@ -19,7 +19,7 @@ def fetch(i):
     q = urllib.parse.urlencode({'p': scenes[i] + ', cinematic lighting, highly detailed, vertical composition', 's': rnd.randint(1, 10**9), 'w': 768, 'h': 1344})
     for _ in range(3):
         try:
-            req = urllib.request.Request(os.environ['WORKER'] + '/vimg?' + q, headers={'X-Video': os.environ['VS']})
+            req = urllib.request.Request(os.environ['WORKER'] + '/vimg?' + q, headers={'X-Video': os.environ['VS'], 'User-Agent': 'hooshfa-video/2 (+github actions)'})
             data = urllib.request.urlopen(req, timeout=150).read()
             img = cv2.imdecode(np.frombuffer(data, np.uint8), cv2.IMREAD_COLOR)
             if img is not None: return img
