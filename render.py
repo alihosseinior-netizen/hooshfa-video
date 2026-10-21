@@ -7,7 +7,8 @@ import numpy as np, cv2
 W, H, FPS, L, XF = 720, 1280, 30, 4.2, 0.6
 SW, SH = 792, 1408  # source canvas (10% margin for camera moves)
 plan = json.loads(os.environ['PLAN'])
-scenes = plan['scenes'][:4]
+scenes = plan['scenes'][:14]
+L = 4.6 if len(scenes) > 6 else 4.2  # ~1 minute for 12-14 scenes
 mood, mkind = plan.get('mood', 'none'), plan.get('music', 'calm')
 os.makedirs('f', exist_ok=True)
 rnd = random.Random(str(plan.get('seed') or os.environ.get('JOB', '1')))  # same seed = same images (paid no-watermark re-render)
@@ -33,6 +34,24 @@ def fit(img):  # cover-crop to SWxSH
     return img[y:y + SH, x:x + SW]
 
 with cf.ThreadPoolExecutor(4) as ex: imgs = [fit(x) for x in ex.map(fetch, range(len(scenes)))]
+
+# ---------- 3b. hero shots: REAL AI motion (Wan 2.2 image-to-video on a free Hugging Face ZeroGPU Space), best effort ----------
+HERO_SPACE = 'zerogpu-aoti/wan2-2-fp8da-aoti-faster'
+motions = plan.get('motions') or []
+hero_idx = [i for i in (plan.get('hero') or [2, len(scenes) - 2]) if isinstance(i, int) and 0 <= i < len(scenes)][:2]
+def hero(i):
+    try:
+        import shutil
+        from gradio_client import Client, handle_file
+        cv2.imwrite(f'f/s{i}.jpg', imgs[i], [cv2.IMWRITE_JPEG_QUALITY, 95])
+        c = Client(HERO_SPACE, token=os.environ.get('HF_TOKEN') or None, verbose=False)
+        mo = motions[i] if i < len(motions) and motions[i] else 'natural cinematic motion, the subject moves, camera slowly follows'
+        r = c.predict(input_image=handle_file(f'f/s{i}.jpg'), prompt=str(mo)[:300] + ', smooth, cinematic, high quality', steps=6, duration_seconds=5, api_name='/generate_video')
+        p = r[0] if isinstance(r, (list, tuple)) else r
+        if isinstance(p, dict): p = p.get('video') or p.get('path')
+        shutil.copy(p, f'f/h{i}.mp4'); print('hero', i, 'ok', flush=True); return True
+    except Exception as e: print('hero', i, 'skipped:', repr(e)[:300], flush=True); return False
+hero_pool = cf.ThreadPoolExecutor(2); hero_jobs = {i: hero_pool.submit(hero, i) for i in hero_idx}
 
 # ---------- 2. depth (bigger = nearer) ----------
 import onnxruntime as ort
@@ -101,6 +120,15 @@ def clip(i, img, d):
     out.stdin.close(); out.wait()
 
 for i, img in enumerate(imgs): clip(i, img, depth(img)); print('clip', i, 'ok', flush=True)
+for i, j in hero_jobs.items():  # swap in real-motion clips that finished (parallax clip stays as fallback)
+    try:
+        if not j.result(timeout=420): continue
+        cap = cv2.VideoCapture(f'f/h{i}.mp4'); dur = cap.get(7) / max(cap.get(5), 1); cap.release()
+        k = max(1.0, L / max(dur, 0.5))
+        sh(f"ffmpeg -y -loglevel error -i f/h{i}.mp4 -vf \"setpts={k:.3f}*PTS,scale=-2:1280:flags=lanczos,crop=720:1280,unsharp=5:5:0.8,fps={FPS},format=yuv420p\" -t {L} -an -c:v libx264 -preset veryfast -crf 18 f/c{i}.mp4")
+        print('hero', i, 'used', flush=True)
+    except Exception as e: print('hero', i, 'not used', repr(e)[:200])
+hero_pool.shutdown(wait=False, cancel_futures=True)
 
 TR = ['fade', 'smoothleft', 'circleopen', 'fadeblack']
 n = len(imgs); T = n * L - (n - 1) * XF
@@ -144,7 +172,6 @@ print('out.mp4', os.path.getsize('out.mp4'))
 
 # ---------- 7. send ----------
 kb = {'inline_keyboard': [[{'text': '🔄 یه ویدیو دیگه', 'callback_data': 'vagain'}]]}
-if os.environ.get('WM', '1') == '1': kb['inline_keyboard'].insert(0, [{'text': '✨ بدون واترمارک (⭐۱۰)', 'callback_data': 'nowm:' + os.environ['JOB']}])
 r = subprocess.run(['curl', '-s', '-F', 'chat_id=' + os.environ['CHAT'], '-F', 'video=@out.mp4', '-F', 'caption=' + os.environ['CAP'], '-F', 'parse_mode=HTML',
     '-F', 'supports_streaming=true', '-F', f'width={W}', '-F', f'height={H}', '-F', f'duration={int(T)}', '-F', 'reply_markup=' + json.dumps(kb),
     f'https://api.telegram.org/bot{os.environ["BOT"]}/sendVideo'], capture_output=True, text=True).stdout
