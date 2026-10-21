@@ -1,0 +1,30 @@
+name: render
+on:
+  repository_dispatch:
+    types: [render]
+concurrency:
+  group: render-${{ github.event.client_payload.job }}
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Render and send
+        env:
+          EN: ${{ github.event.client_payload.en }}
+          CHAT: ${{ github.event.client_payload.chat }}
+          CAP: ${{ github.event.client_payload.cap }}
+          JOB: ${{ github.event.client_payload.job }}
+          WORKER: ${{ secrets.WORKER }}
+          VS: ${{ secrets.VIDEO_SECRET }}
+          BOT: ${{ secrets.BOT_TOKEN }}
+        run: bash render.sh
+      - name: Report result to the bot
+        if: always()
+        env:
+          WORKER: ${{ secrets.WORKER }}
+          VS: ${{ secrets.VIDEO_SECRET }}
+          CHAT: ${{ github.event.client_payload.chat }}
+          JOB: ${{ github.event.client_payload.job }}
+        run: curl -s -G "$WORKER/vdone" -H "X-Video: $VS" --data-urlencode "ok=${{ job.status == 'success' && '1' || '0' }}" --data-urlencode "chat=$CHAT" --data-urlencode "job=$JOB" || true
