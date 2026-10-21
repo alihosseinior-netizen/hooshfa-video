@@ -14,11 +14,12 @@ for i in 0 1 2 3; do
   done
   [ $ok = 1 ] || { echo "image $i failed"; exit 1; }
 done
-# Each clip 4s at 25fps; alternate zoom in / zoom out / pan so it feels alive.
+# Each clip 4s at 25fps, VERTICAL 720x1280 (Reels/Shorts): zoom on the square image, then a 9:16 window (pans on clip 3).
 Z=("min(zoom+0.0020,1.35)" "if(eq(on,0),1.35,max(zoom-0.0020,1.0))" "1.25" "min(zoom+0.0015,1.30)")
-X=("iw/2-(iw/zoom/2)" "iw/2-(iw/zoom/2)" "(iw-iw/zoom)*on/100" "iw/2-(iw/zoom/2)")
+X=("iw/2-(iw/zoom/2)" "iw/2-(iw/zoom/2)" "iw/2-(iw/zoom/2)" "iw/2-(iw/zoom/2)")
+CX=("280" "280" "560*t/4" "280")
 for i in 0 1 2 3; do
-  ffmpeg -y -loglevel error -loop 1 -i "f/$i.jpg" -vf "scale=2048:2048,zoompan=z='${Z[$i]}':x='${X[$i]}':y='ih/2-(ih/zoom/2)':d=100:s=1024x1024:fps=25,format=yuv420p" -t 4 -c:v libx264 -preset veryfast "f/c$i.mp4"
+  ffmpeg -y -loglevel error -loop 1 -i "f/$i.jpg" -vf "scale=2048:2048,zoompan=z='${Z[$i]}':x='${X[$i]}':y='ih/2-(ih/zoom/2)':d=100:s=1280x1280:fps=25,crop=720:1280:x='${CX[$i]}':y=0,format=yuv420p" -t 4 -c:v libx264 -preset veryfast "f/c$i.mp4"
 done
 # Crossfade chain (0.6s each): total 4*4 - 3*0.6 = 14.2s
 ffmpeg -y -loglevel error -i f/c0.mp4 -i f/c1.mp4 -i f/c2.mp4 -i f/c3.mp4 -filter_complex \
@@ -33,5 +34,5 @@ WM="drawtext=fontfile=$FONT:text='@hooshfa_bot':fontcolor=white@0.85:fontsize=34
 ffmpeg -y -loglevel error -i f/v.mp4 -i f/a.m4a -vf "$WM" -c:v libx264 -preset veryfast -crf 23 -c:a copy -shortest -movflags +faststart out.mp4
 ls -la out.mp4
 KB='{"inline_keyboard":[[{"text":"🔄 یه ویدیو دیگه","callback_data":"vagain"}]]}'
-R=$(curl -s -F chat_id="$CHAT" -F video=@out.mp4 -F caption="$CAP" -F parse_mode=HTML -F supports_streaming=true -F width=1024 -F height=1024 -F duration=14 -F reply_markup="$KB" "https://api.telegram.org/bot$BOT/sendVideo")
+R=$(curl -s -F chat_id="$CHAT" -F video=@out.mp4 -F caption="$CAP" -F parse_mode=HTML -F supports_streaming=true -F width=720 -F height=1280 -F duration=14 -F reply_markup="$KB" "https://api.telegram.org/bot$BOT/sendVideo")
 echo "$R" | grep -q '"ok":true' || { echo "telegram send failed: $(echo "$R" | head -c 200)"; exit 1; }
