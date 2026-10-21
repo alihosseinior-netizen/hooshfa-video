@@ -1,0 +1,21 @@
+name: hftest
+on:
+  workflow_dispatch:
+    inputs:
+      mode: { description: api or run, required: true, default: api }
+      spaces: { description: comma separated Space ids, required: true }
+      args: { description: JSON for run mode, required: false, default: '{}' }
+      chat: { description: Telegram chat id, required: false, default: '' }
+jobs:
+  t:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install -q gradio_client
+      - env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          BOT: ${{ secrets.BOT_TOKEN }}
+          CHAT: ${{ github.event.inputs.chat }}
+          ARGS: ${{ github.event.inputs.args }}
+        run: python hftest.py "${{ github.event.inputs.mode }}" "${{ github.event.inputs.spaces }}"
