@@ -1,0 +1,23 @@
+name: voices
+on:
+  workflow_dispatch:
+    inputs:
+      chat:
+        description: Telegram chat id to receive samples
+        required: true
+jobs:
+  voices:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Make one sample per Persian voice and send it
+        env:
+          BOT: ${{ secrets.BOT_TOKEN }}
+          CHAT: ${{ github.event.inputs.chat }}
+        run: |
+          T="سلام! من هوش مصنوعی فارسی‌ام. این ویدیو رو برای تو ساختم؛ یه قلعه‌ی جادویی وسط ابرها، موقع غروب خورشید."
+          for v in amir gyro ganji reza_ibrahim; do
+            bash voice.sh "$v" "$T" "$v.wav" && ffmpeg -y -loglevel error -i "$v.wav" -c:a libopus -b:a 48k "$v.ogg" 2>/dev/null || { sudo apt-get install -y -qq ffmpeg >/dev/null; ffmpeg -y -loglevel error -i "$v.wav" -c:a libopus -b:a 48k "$v.ogg"; }
+            curl -s -F chat_id="$CHAT" -F voice=@"$v.ogg" -F caption="🎙 صدای $v" "https://api.telegram.org/bot$BOT/sendVoice" | head -c 80; echo
+          done
