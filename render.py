@@ -144,7 +144,7 @@ print('out.mp4', os.path.getsize('out.mp4'))
 
 # ---------- 7. send ----------
 kb = {'inline_keyboard': [[{'text': '🔄 یه ویدیو دیگه', 'callback_data': 'vagain'}]]}
-if os.environ.get('WM', '1') == '1': kb['inline_keyboard'].insert(0, [{'text': '✨ بدون واترمارک (⭐۳۰)', 'callback_data': 'nowm:' + os.environ['JOB']}])
+if os.environ.get('WM', '1') == '1': kb['inline_keyboard'].insert(0, [{'text': '✨ بدون واترمارک (⭐۱۰)', 'callback_data': 'nowm:' + os.environ['JOB']}])
 r = subprocess.run(['curl', '-s', '-F', 'chat_id=' + os.environ['CHAT'], '-F', 'video=@out.mp4', '-F', 'caption=' + os.environ['CAP'], '-F', 'parse_mode=HTML',
     '-F', 'supports_streaming=true', '-F', f'width={W}', '-F', f'height={H}', '-F', f'duration={int(T)}', '-F', 'reply_markup=' + json.dumps(kb),
     f'https://api.telegram.org/bot{os.environ["BOT"]}/sendVideo'], capture_output=True, text=True).stdout
